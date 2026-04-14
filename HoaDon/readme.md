@@ -1,0 +1,1 @@
+c:/COURSES/KTDL/HoaDon/.venv/Scripts/python.exe .\app.py

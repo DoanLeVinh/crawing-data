@@ -1,0 +1,136 @@
+:root {
+  --bg: #f4f7fb;
+  --card: #ffffff;
+  --text: #132238;
+  --muted: #5b6b80;
+  --line: #dfe6ef;
+  --accent: #0f766e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  background: linear-gradient(180deg, #eef4ff 0%, #f9fcff 100%);
+  color: var(--text);
+}
+.page {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 0 16px 24px;
+}
+header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 14px;
+  box-shadow: 0 6px 18px rgba(26, 43, 72, 0.05);
+}
+.error {
+  border-color: #f2b8b5;
+  background: #fff6f5;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+input {
+  border: 1px solid #cfd8e6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: white;
+  background: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+}
+.summary {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.search-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-row input {
+  flex: 1;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.product-card {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  text-decoration: none;
+  color: var(--text);
+  background: #fbfdff;
+}
+
+.product-card:hover {
+  border-color: #9ab7d5;
+  box-shadow: 0 4px 12px rgba(26, 43, 72, 0.08);
+}
+
+.product-card h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.product-card p {
+  margin: 3px 0;
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--muted);
+}
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.result-table th,
+.result-table td {
+  border: 1px solid #e5eaf1;
+  padding: 8px;
+  text-align: left;
+}
+.result-table th {
+  background: #f7fafc;
+}
+.empty {
+  color: var(--muted);
+  font-style: italic;
+}

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market Basket Demo - mlxtend</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Market Basket Analysis Demo</h1>
+      <p>Apriori + Association Rules with mlxtend</p>
+      <p><a href="{{ url_for('products') }}">Go to Product Catalog Demo</a></p>
+    </header>
+
+    <section class="card">
+      <form method="post" class="form-grid">
+        <label>Data file
+          <input type="text" name="data_file" value="{{ params.data_file }}" />
+        </label>
+        <label>Min support
+          <input type="number" step="0.001" min="0" max="1" name="min_support" value="{{ params.min_support }}" />
+        </label>
+        <label>Min confidence
+          <input type="number" step="0.001" min="0" max="1" name="min_confidence" value="{{ params.min_confidence }}" />
+        </label>
+        <label>Min lift
+          <input type="number" step="0.01" min="0" name="min_lift" value="{{ params.min_lift }}" />
+        </label>
+        <label>Max itemset length
+          <input type="number" min="2" max="6" name="max_len" value="{{ params.max_len }}" />
+        </label>
+        <label>Max rules shown
+          <input type="number" min="10" max="500" name="max_rules" value="{{ params.max_rules }}" />
+        </label>
+        <button type="submit">Run analysis</button>
+      </form>
+    </section>
+
+    {% if error %}
+    <section class="card error">
+      <strong>Error:</strong> {{ error }}
+    </section>
+    {% endif %}
+
+    {% if summary %}
+    <section class="card">
+      <h2>Summary</h2>
+      <ul class="summary">
+        <li>Transactions: {{ summary.n_transactions }}</li>
+        <li>Unique items: {{ summary.n_unique_items }}</li>
+        <li>Frequent itemsets: {{ summary.n_frequent_itemsets }}</li>
+        <li>Rules: {{ summary.n_rules }}</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Cross-selling candidates (high confidence)</h2>
+      {{ cross_sell_table|safe }}
+    </section>
+
+    <section class="card">
+      <h2>Bundling candidates (high lift + low support item)</h2>
+      {{ bundle_table|safe }}
+    </section>
+
+    <section class="card">
+      <h2>Shelf positioning - convenience</h2>
+      {{ shelf_convenience_table|safe }}
+    </section>
+
+    <section class="card">
+      <h2>Shelf positioning - stimulation</h2>
+      {{ shelf_stimulation_table|safe }}
+    </section>
+
+    <section class="card">
+      <h2>All generated rules</h2>
+      {{ rules_table|safe }}
+    </section>
+    {% endif %}
+  </div>
+</body>
+</html>

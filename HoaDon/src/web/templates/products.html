@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Products - Recommendation Demo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Product Catalog</h1>
+      <p>Click a product to see detail and recommendation strictly generated from association rules.</p>
+      <p>
+        <a href="{{ url_for('index') }}">Back to Rules Dashboard</a>
+      </p>
+    </header>
+
+    {% if error %}
+    <section class="card error">
+      <strong>Error:</strong> {{ error }}
+    </section>
+    {% endif %}
+
+    <section class="card">
+      <form method="get" class="search-row">
+        <input type="text" name="q" placeholder="Search product..." value="{{ q }}">
+        <button type="submit">Search</button>
+      </form>
+      <p class="muted">Rules file exported: {{ rules_export_file }}</p>
+    </section>
+
+    <section class="card">
+      <h2>Products ({{ products|length }})</h2>
+      <div class="product-grid">
+        {% for p in products %}
+          <a class="product-card" href="{{ url_for('product_detail_by_id', product_id=p.product_id) }}">
+            <h3>{{ p.product_name }}</h3>
+            <p>Orders: {{ p.order_count }}</p>
+            <p>Avg price: {{ '%.0f'|format(p.avg_unit_price or 0) }} VND</p>
+            <p>Revenue: {{ '%.0f'|format(p.total_revenue or 0) }} VND</p>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product Detail - Recommendation Demo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Product Detail</h1>
+      <p><a href="{{ url_for('products') }}">Back to Product Catalog</a></p>
+    </header>
+
+    {% if error %}
+    <section class="card error">
+      <strong>Error:</strong> {{ error }}
+    </section>
+    {% endif %}
+
+    {% if product %}
+    <section class="card">
+      <h2>{{ product.product_name }}</h2>
+      <p>Orders: {{ product.order_count }}</p>
+      <p>Line count: {{ product.line_count }}</p>
+      <p>Total quantity: {{ '%.0f'|format(product.total_quantity or 0) }}</p>
+      <p>Avg price: {{ '%.0f'|format(product.avg_unit_price or 0) }} VND</p>
+      <p>Total revenue: {{ '%.0f'|format(product.total_revenue or 0) }} VND</p>
+      <p>Platform example: {{ product.platform_example }}</p>
+    </section>
+
+    <section class="card">
+      <h2>San pham goi y mua kem (tu quy luat ket hop)</h2>
+      {% if recommendations and recommendations|length > 0 %}
+      <div class="product-grid">
+        {% for r in recommendations %}
+          <a class="product-card" href="{{ url_for('product_detail_by_id', product_id=r.product_id) }}">
+            <h3>{{ r.product_name }}</h3>
+            <p>Nguon goi y: {{ r.source }}</p>
+            <p>Confidence: {{ '%.3f'|format(r.confidence or 0) }}</p>
+            <p>Lift: {{ '%.3f'|format(r.lift or 0) }}</p>
+            <p>Support: {{ '%.3f'|format(r.support or 0) }}</p>
+            <p>Consequent support: {{ '%.3f'|format(r.consequent_support or 0) }}</p>
+            <p>Avg price: {{ '%.0f'|format(r.avg_unit_price or 0) }} VND</p>
+          </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty">Khong co goi y tu quy luat ket hop cho san pham nay voi bo nguong hien tai.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+  </div>
+</body>
+</html>
