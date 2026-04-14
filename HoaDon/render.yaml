@@ -4,9 +4,9 @@ services:
     runtime: python
     plan: free
     buildCommand: sh -c 'if [ -f requirements.txt ]; then pip install -r requirements.txt; elif [ -f HoaDon/requirements.txt ]; then pip install -r HoaDon/requirements.txt; else echo "requirements.txt not found in current directory or HoaDon/"; exit 1; fi'
-    startCommand: sh -c 'if [ -f app.py ]; then gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120; elif [ -f HoaDon/app.py ]; then gunicorn --chdir HoaDon app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120; else echo "app.py not found in current directory or HoaDon/"; exit 1; fi'
+    startCommand: sh -c 'if [ -f app.py ]; then gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300; elif [ -f HoaDon/app.py ]; then gunicorn --chdir HoaDon app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300; else echo "app.py not found in current directory or HoaDon/"; exit 1; fi'
     autoDeploy: true
-    healthCheckPath: /
+    healthCheckPath: /healthz
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"

@@ -117,7 +117,7 @@ def build_product_catalog(invoice_lines: pd.DataFrame) -> pd.DataFrame:
 def build_recommendation_index(
     raw_rules: pd.DataFrame,
     source_label: str = "association_rule",
-    include_reverse: bool = True,
+    include_reverse: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
     rec_idx: dict[str, list[dict[str, Any]]] = {}
     if raw_rules is None or raw_rules.empty:
@@ -143,7 +143,10 @@ def build_recommendation_index(
         lift = float(r.get("lift", 0.0))
         support = float(r.get("support", 0.0))
         consequent_support = float(r.get("consequent support", support))
-        if confidence <= 0.0 or lift <= 1.0 or support <= 0.0:
+        # Loai bo goi y qua pho thong (vd: item xuat hien qua nhieu don) va tin hieu yeu.
+        if confidence < 0.03 or lift <= 1.0 or support <= 0.0:
+            continue
+        if consequent_support >= 0.45:
             continue
         if not _is_reasonable_pair(ant, cons, support, lift):
             continue
@@ -151,7 +154,8 @@ def build_recommendation_index(
         # Xep hang thuần theo do manh luat ket hop.
         lift_capped = min(lift, 8.0)
         support_weight = max(0.01, support ** 0.5)
-        score = confidence * lift_capped * support_weight
+        novelty_weight = max(0.05, (1.0 - consequent_support) ** 1.5)
+        score = confidence * lift_capped * support_weight * novelty_weight
 
         candidate = {
             "product_key": cons,
@@ -173,20 +177,23 @@ def build_recommendation_index(
             reverse_confidence = 0.0
             if consequent_support > 0:
                 reverse_confidence = support / consequent_support
+            antecedent_support = float(r.get("antecedent support", support))
             reverse_lift_capped = min(lift, 8.0)
             reverse_support_weight = max(0.01, support ** 0.5)
+            reverse_novelty_weight = max(0.05, (1.0 - antecedent_support) ** 1.5)
             reverse_score = (
                 reverse_confidence
                 * reverse_lift_capped
                 * reverse_support_weight
+                * reverse_novelty_weight
             )
-            if reverse_confidence > 0:
+            if reverse_confidence >= 0.03 and antecedent_support < 0.45:
                 reverse_candidate = {
                     "product_key": ant,
                     "confidence": reverse_confidence,
                     "lift": lift,
                     "support": support,
-                    "consequent_support": float(r.get("antecedent support", support)),
+                    "consequent_support": antecedent_support,
                     "score": reverse_score,
                     "source": f"{source_label}_reverse",
                 }
@@ -234,7 +241,7 @@ def build_rules_export(result: AnalysisResult) -> pd.DataFrame:
 def build_pair_rule_fallback_index(
     invoice_lines: pd.DataFrame,
     min_support: float = 0.0005,
-    min_lift: float = 1.0,
+    min_lift: float = 1.1,
 ) -> dict[str, list[dict[str, Any]]]:
     tx_map = (
         invoice_lines.groupby("receipt_id")["product_key"]
@@ -283,32 +290,45 @@ def build_pair_rule_fallback_index(
         conf_ba = c / item_count[b] if item_count[b] else 0.0
 
         lift_capped = min(lift, 8.0)
-        cand_ab = {
-            "product_key": b,
-            "confidence": conf_ab,
-            "lift": lift,
-            "support": support,
-            "consequent_support": sup_b,
-            "score": conf_ab * lift_capped * (support ** 0.5),
-            "source": "association_rule_pair",
-        }
-        cand_ba = {
-            "product_key": a,
-            "confidence": conf_ba,
-            "lift": lift,
-            "support": support,
-            "consequent_support": sup_a,
-            "score": conf_ba * lift_capped * (support ** 0.5),
-            "source": "association_rule_pair",
-        }
+        novelty_b = max(0.05, (1.0 - sup_b) ** 1.5)
+        novelty_a = max(0.05, (1.0 - sup_a) ** 1.5)
 
-        ex_ab = rec_idx[a].get(b)
-        if ex_ab is None or cand_ab["score"] > ex_ab["score"]:
-            rec_idx[a][b] = cand_ab
+        # Bo cac de xuat qua pho thong hoac confidence qua yeu.
+        if sup_b >= 0.45 or conf_ab < 0.03:
+            cand_ab = None
+        else:
+            cand_ab = {
+                "product_key": b,
+                "confidence": conf_ab,
+                "lift": lift,
+                "support": support,
+                "consequent_support": sup_b,
+                "score": conf_ab * lift_capped * (support ** 0.5) * novelty_b,
+                "source": "association_rule_pair",
+            }
 
-        ex_ba = rec_idx[b].get(a)
-        if ex_ba is None or cand_ba["score"] > ex_ba["score"]:
-            rec_idx[b][a] = cand_ba
+        if sup_a >= 0.45 or conf_ba < 0.03:
+            cand_ba = None
+        else:
+            cand_ba = {
+                "product_key": a,
+                "confidence": conf_ba,
+                "lift": lift,
+                "support": support,
+                "consequent_support": sup_a,
+                "score": conf_ba * lift_capped * (support ** 0.5) * novelty_a,
+                "source": "association_rule_pair",
+            }
+
+        if cand_ab is not None:
+            ex_ab = rec_idx[a].get(b)
+            if ex_ab is None or cand_ab["score"] > ex_ab["score"]:
+                rec_idx[a][b] = cand_ab
+
+        if cand_ba is not None:
+            ex_ba = rec_idx[b].get(a)
+            if ex_ba is None or cand_ba["score"] > ex_ba["score"]:
+                rec_idx[b][a] = cand_ba
 
     final_idx: dict[str, list[dict[str, Any]]] = {}
     for ant, rec_map in rec_idx.items():
@@ -323,10 +343,10 @@ def build_pair_rule_fallback_index(
 
 def run_full_recommendation_pipeline(
     csv_path: str | Path = DEFAULT_DATA_FILE,
-    min_support: float = 0.01,
+    min_support: float = 0.02,
     min_confidence: float = 0.30,
     min_lift: float = 1.20,
-    max_len: int = 3,
+    max_len: int = 2,
 ) -> dict[str, Any]:
     invoice_lines = load_invoice_lines(csv_path)
     catalog = build_product_catalog(invoice_lines)
@@ -343,14 +363,14 @@ def run_full_recommendation_pipeline(
     rec_idx_strict = build_recommendation_index(
         analysis_result.raw_rules,
         source_label="association_rule",
-        include_reverse=True,
+        include_reverse=False,
     )
 
     # Lop 2: fallback theo cap dong xuat hien (pair rules), toi uu bo nho cho 11k hoa don.
     rec_idx_relaxed = build_pair_rule_fallback_index(
         invoice_lines,
-        min_support=max(0.00005, min_support / 200),
-        min_lift=1.0,
+        min_support=max(0.0002, min_support / 80),
+        min_lift=1.1,
     )
 
     rec_idx: dict[str, list[dict[str, Any]]] = {}

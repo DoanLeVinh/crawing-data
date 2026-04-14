@@ -19,6 +19,12 @@
     </section>
     {% endif %}
 
+    {% if loading %}
+    <section class="card info">
+      <strong>Info:</strong> Du lieu dang duoc khoi tao nen. Vui long doi va thu lai trong giay lat.
+    </section>
+    {% endif %}
+
     {% if product %}
     <section class="card">
       <h2>{{ product.product_name }}</h2>

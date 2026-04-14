@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,10 +22,10 @@ RULES_EXPORT_PATH = BASE_DIR / "outputs" / "rules" / "association_rules_products
 APP_STATE: dict[str, Any] = {
     "params": {
         "data_file": DEFAULT_DATA_FILE,
-        "min_support": 0.01,
+        "min_support": 0.02,
         "min_confidence": 0.30,
         "min_lift": 1.20,
-        "max_len": 3,
+        "max_len": 2,
         "max_rules": 50,
     },
     "catalog": None,
@@ -31,7 +33,11 @@ APP_STATE: dict[str, Any] = {
     "recommendation_index": {},
     "rules_export": None,
     "error": None,
+    "loading": False,
+    "last_loaded_at": None,
 }
+
+_STATE_LOCK = threading.Lock()
 
 
 def _safe_float(value: str, default: float) -> float:
@@ -83,6 +89,37 @@ def _refresh_state(params: dict[str, Any]) -> None:
         APP_STATE["rules_export"].to_csv(RULES_EXPORT_PATH, index=False, encoding="utf-8-sig")
 
 
+def _run_refresh_in_background(params: dict[str, Any]) -> None:
+    try:
+        _refresh_state(params)
+        APP_STATE["last_loaded_at"] = datetime.utcnow().isoformat()
+    except Exception as exc:
+        APP_STATE["error"] = str(exc)
+    finally:
+        APP_STATE["loading"] = False
+
+
+def _ensure_state_loaded_async(force: bool = False, params: dict[str, Any] | None = None) -> bool:
+    with _STATE_LOCK:
+        if APP_STATE.get("loading"):
+            return False
+        if not force and APP_STATE.get("analysis") is not None:
+            return False
+
+        target_params = dict(params or APP_STATE["params"])
+        APP_STATE["loading"] = True
+        APP_STATE["error"] = None
+
+        t = threading.Thread(target=_run_refresh_in_background, args=(target_params,), daemon=True)
+        t.start()
+        return True
+
+
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    return {"ok": True, "loading": bool(APP_STATE.get("loading"))}, 200
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     params = dict(APP_STATE["params"])
@@ -96,22 +133,25 @@ def index():
         "shelf_convenience_table": None,
         "shelf_stimulation_table": None,
         "error": APP_STATE.get("error"),
+        "loading": bool(APP_STATE.get("loading")),
+        "loading_message": None,
     }
 
     if request.method == "POST":
         params["data_file"] = request.form.get("data_file", DEFAULT_DATA_FILE).strip() or DEFAULT_DATA_FILE
-        params["min_support"] = _safe_float(request.form.get("min_support", "0.01"), 0.01)
+        params["min_support"] = _safe_float(request.form.get("min_support", "0.02"), 0.02)
         params["min_confidence"] = _safe_float(request.form.get("min_confidence", "0.30"), 0.30)
         params["min_lift"] = _safe_float(request.form.get("min_lift", "1.20"), 1.20)
-        params["max_len"] = _safe_int(request.form.get("max_len", "3"), 3)
+        params["max_len"] = _safe_int(request.form.get("max_len", "2"), 2)
         params["max_rules"] = _safe_int(request.form.get("max_rules", "50"), 50)
+        APP_STATE["params"] = dict(params)
+        _ensure_state_loaded_async(force=True, params=params)
+        return redirect(url_for("products", loading="1"))
 
-        try:
-            _refresh_state(params)
-            return redirect(url_for("products"))
-        except Exception as exc:
-            APP_STATE["error"] = str(exc)
-            context["error"] = str(exc)
+    if APP_STATE.get("analysis") is None:
+        started = _ensure_state_loaded_async(force=False)
+        if started or APP_STATE.get("loading"):
+            context["loading_message"] = "Dang khoi tao du lieu phan tich. Vui long cho trong giay lat va tai lai trang."
 
     analysis = APP_STATE.get("analysis")
     if analysis is not None:
@@ -129,13 +169,11 @@ def index():
 @app.route("/products", methods=["GET"])
 def products():
     if APP_STATE.get("catalog") is None:
-        try:
-            _refresh_state(dict(APP_STATE["params"]))
-        except Exception as exc:
-            APP_STATE["error"] = str(exc)
+        _ensure_state_loaded_async(force=False)
 
     catalog = APP_STATE.get("catalog")
     error = APP_STATE.get("error")
+    loading = bool(APP_STATE.get("loading"))
     q = request.args.get("q", "").strip().lower()
 
     products_data: list[dict[str, Any]] = []
@@ -151,6 +189,7 @@ def products():
         products=products_data,
         q=q,
         error=error,
+        loading=loading,
         rules_export_file=str(RULES_EXPORT_PATH),
     )
 
@@ -184,21 +223,25 @@ def _build_product_detail_context(catalog, product_row, error):
         product=product,
         recommendations=recommendations,
         error=error,
+        loading=bool(APP_STATE.get("loading")),
     )
 
 
 @app.route("/product/id/<int:product_id>", methods=["GET"])
 def product_detail_by_id(product_id: int):
     if APP_STATE.get("catalog") is None:
-        try:
-            _refresh_state(dict(APP_STATE["params"]))
-        except Exception as exc:
-            APP_STATE["error"] = str(exc)
+        _ensure_state_loaded_async(force=False)
 
     catalog = APP_STATE.get("catalog")
     error = APP_STATE.get("error")
     if catalog is None or catalog.empty:
-        return render_template("product_detail.html", product=None, recommendations=[], error=error)
+        return render_template(
+            "product_detail.html",
+            product=None,
+            recommendations=[],
+            error=error,
+            loading=bool(APP_STATE.get("loading")),
+        )
 
     match = catalog[catalog["product_id"] == product_id]
     if match.empty:
@@ -210,15 +253,18 @@ def product_detail_by_id(product_id: int):
 @app.route("/product/<path:product_key>", methods=["GET"])
 def product_detail(product_key: str):
     if APP_STATE.get("catalog") is None:
-        try:
-            _refresh_state(dict(APP_STATE["params"]))
-        except Exception as exc:
-            APP_STATE["error"] = str(exc)
+        _ensure_state_loaded_async(force=False)
 
     catalog = APP_STATE.get("catalog")
     error = APP_STATE.get("error")
     if catalog is None or catalog.empty:
-        return render_template("product_detail.html", product=None, recommendations=[], error=error)
+        return render_template(
+            "product_detail.html",
+            product=None,
+            recommendations=[],
+            error=error,
+            loading=bool(APP_STATE.get("loading")),
+        )
 
     match = catalog[catalog["product_key"] == product_key]
     if match.empty:

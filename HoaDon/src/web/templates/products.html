@@ -22,6 +22,12 @@
     </section>
     {% endif %}
 
+    {% if loading %}
+    <section class="card info">
+      <strong>Info:</strong> He thong dang xu ly du lieu nen. Vui long doi mot chut roi tai lai trang.
+    </section>
+    {% endif %}
+
     <section class="card">
       <form method="get" class="search-row">
         <input type="text" name="q" placeholder="Search product..." value="{{ q }}">

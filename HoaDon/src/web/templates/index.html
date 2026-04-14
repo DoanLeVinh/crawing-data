@@ -15,7 +15,7 @@
     </header>
 
     <section class="card">
-      <form method="post" class="form-grid">
+      <form method="post" class="form-grid" id="analysis-form">
         <label>Data file
           <input type="text" name="data_file" value="{{ params.data_file }}" />
         </label>
@@ -34,13 +34,22 @@
         <label>Max rules shown
           <input type="number" min="10" max="500" name="max_rules" value="{{ params.max_rules }}" />
         </label>
-        <button type="submit">Run analysis</button>
+        <button type="submit" id="run-analysis-btn" {% if loading %}disabled{% endif %}>Run analysis</button>
       </form>
+      {% if loading %}
+      <p class="muted">Dang phan tich du lieu nen. Nut Run analysis se mo lai sau khi hoan tat.</p>
+      {% endif %}
     </section>
 
     {% if error %}
     <section class="card error">
       <strong>Error:</strong> {{ error }}
+    </section>
+    {% endif %}
+
+    {% if loading_message %}
+    <section class="card info">
+      <strong>Info:</strong> {{ loading_message }}
     </section>
     {% endif %}
 
@@ -81,5 +90,18 @@
     </section>
     {% endif %}
   </div>
+  <script>
+    (function () {
+      var form = document.getElementById('analysis-form');
+      var btn = document.getElementById('run-analysis-btn');
+      if (!form || !btn) {
+        return;
+      }
+      form.addEventListener('submit', function () {
+        btn.disabled = true;
+        btn.textContent = 'Analyzing...';
+      });
+    })();
+  </script>
 </body>
 </html>
